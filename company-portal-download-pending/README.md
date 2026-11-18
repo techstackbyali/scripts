@@ -2,9 +2,17 @@
 
 A PowerShell triage and optional retry helper for software that remains at **Download pending** inside Windows Company Portal. It does not troubleshoot installation of the Company Portal app itself.
 
-## Run
+## Download and run
 
-Open PowerShell on the affected device and run the script from the folder where you saved it:
+1. Open [Get-CompanyPortalDownloadPending.ps1](https://github.com/techstackbyali/scripts/blob/main/company-portal-download-pending/Get-CompanyPortalDownloadPending.ps1) on GitHub. Review the code, then use GitHub's **Download raw file** control to save the `.ps1` file on the affected Windows device.
+2. Open PowerShell and change to the folder containing the saved file. For example, if it is in Downloads:
+
+   ```powershell
+   Set-Location "$env:USERPROFILE\Downloads"
+   ```
+3. Run the read-only check below. Open PowerShell **as Administrator** only for the optional retry described later.
+
+Run the script from the folder where you saved it:
 
 ```powershell
 .\Get-CompanyPortalDownloadPending.ps1
@@ -17,6 +25,8 @@ If your Intune administrator provides the app's GUID, narrow the log check:
 ```
 
 Replace the example GUID with the actual app ID. The script reads only the last 1,000 lines of each relevant IME log by default. Use `-TailLines 3000` if the attempt is older. By default it does not change device state or send data anywhere.
+
+If Windows blocks the downloaded script, ask your IT administrator to review and approve it under your organization's PowerShell policy. Do not change or bypass a managed execution policy just to run this tool.
 
 ## Try a Win32 app check-in
 
