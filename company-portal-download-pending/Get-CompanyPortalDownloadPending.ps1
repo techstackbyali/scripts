@@ -1,12 +1,14 @@
-# Read-only Windows Company Portal / Intune Win32 app triage.
-# This script does not sync, restart services, remove files, or upload logs.
-[CmdletBinding()]
+# Windows Company Portal / Intune Win32 app triage.
+# Read-only by default. -RetryWin32 explicitly restarts/starts the IME service.
+[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
     [ValidatePattern('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')]
     [string]$AppId,
 
     [ValidateRange(100, 10000)]
-    [int]$TailLines = 1000
+    [int]$TailLines = 1000,
+
+    [switch]$RetryWin32
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,7 +19,7 @@ $logNames = @(
     'AppActionProcessor.log'
 )
 
-Write-Output 'Company Portal "Download pending" - read-only triage'
+Write-Output 'Company Portal "Download pending" - Win32 app triage'
 Write-Output ('Checked at: {0}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss zzz'))
 Write-Output 'Scope: Windows Company Portal app installs. IME checks below apply to Win32 apps.'
 Write-Output ''
@@ -85,4 +87,37 @@ Write-Output '5. If content transfer fails, review current Microsoft Intune netw
 Write-Output '6. If installation begins and fails, investigate the installer and detection rule instead.'
 Write-Output ''
 Write-Output 'This script does not identify a single root cause. Do not post raw device logs publicly.'
+
+if ($RetryWin32) {
+    Write-Output ''
+    Write-Output 'Requested action: trigger a fresh Win32 app check-in through the Intune Management Extension.'
+    if (-not $ime) {
+        Write-Warning 'The IME service is missing. No retry is possible here. Confirm app type and assignment in Intune.'
+        return
+    }
+
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+    if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        Write-Warning 'Open PowerShell as Administrator to use -RetryWin32. No service change was made.'
+        return
+    }
+
+    $verb = if ($ime.Status -eq 'Running') { 'Restart' } else { 'Start' }
+    if ($PSCmdlet.ShouldProcess('IntuneManagementExtension service', "$verb service and request a new check-in")) {
+        try {
+            if ($verb -eq 'Restart') {
+                Restart-Service -Name IntuneManagementExtension -ErrorAction Stop
+            } else {
+                Start-Service -Name IntuneManagementExtension -ErrorAction Stop
+            }
+            $current = Get-Service -Name IntuneManagementExtension -ErrorAction Stop
+            Write-Output ('IME service after action: {0}' -f $current.Status)
+            Write-Output 'Check Company Portal again. If the app remains frozen for two hours, use Restart installation if offered.'
+            Write-Output 'A service check-in cannot fix incorrect assignment, requirements, network delivery, or installer errors.'
+        } catch {
+            Write-Warning ('IME service action failed: {0}' -f $_.Exception.Message)
+        }
+    }
+}
 
