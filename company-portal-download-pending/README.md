@@ -1,6 +1,6 @@
 # Company Portal app stuck on Download pending
 
-A read-only PowerShell triage helper for software that remains at **Download pending** inside Windows Company Portal. It does not troubleshoot installation of the Company Portal app itself.
+A PowerShell triage and optional retry helper for software that remains at **Download pending** inside Windows Company Portal. It does not troubleshoot installation of the Company Portal app itself.
 
 ## Run
 
@@ -16,7 +16,25 @@ If your Intune administrator provides the app's GUID, narrow the log check:
 .\Get-CompanyPortalDownloadPending.ps1 -AppId '00000000-0000-0000-0000-000000000000'
 ```
 
-Replace the example GUID with the actual app ID. The script reads only the last 1,000 lines of each relevant IME log by default. Use `-TailLines 3000` if the attempt is older. It does not change device state, restart services, clear caches, or send data anywhere.
+Replace the example GUID with the actual app ID. The script reads only the last 1,000 lines of each relevant IME log by default. Use `-TailLines 3000` if the attempt is older. By default it does not change device state or send data anywhere.
+
+## Try a Win32 app check-in
+
+If a **Win32 app** has been genuinely stalled, there is no active installation you would interrupt, and the IME service is present, open PowerShell **as Administrator** on that device. Preview the action first:
+
+```powershell
+.\Get-CompanyPortalDownloadPending.ps1 -RetryWin32 -WhatIf
+```
+
+Then run the retry and accept the PowerShell confirmation prompt:
+
+```powershell
+.\Get-CompanyPortalDownloadPending.ps1 -RetryWin32
+```
+
+This restarts the running `IntuneManagementExtension` service, or starts it if stopped. [Microsoft documents](https://learn.microsoft.com/en-us/intune/device-management/tools/management-extension-windows) that restarting IME initiates a check-in. Reopen Company Portal and check the app. If progress has not changed for two hours, use **Restart installation** in Company Portal if offered. This script cannot click that app-specific control for you. Do not repeatedly restart IME or run this while another app is actively installing.
+
+The retry can help if the pending state reflects a delayed IME check-in. It cannot repair incorrect targeting, requirements, network access, content delivery, installer commands, or detection rules. For a Microsoft Store app, use Company Portal Sync and the reported error instead; the IME service is specific to Win32 app management. The script does not clear caches, re-enroll the device, or bypass security controls.
 
 ## Interpret the result
 
@@ -35,6 +53,7 @@ Microsoft recommends a manual sync for stalled work-app downloads. Windows Compa
 
 - [Sync an enrolled Windows device](https://learn.microsoft.com/en-us/intune/user-help/device-actions/sync-device-windows)
 - [Restart a stalled Company Portal installation](https://learn.microsoft.com/en-us/intune/app-management/deployment/)
+- [Understand IME and initiate a check-in](https://learn.microsoft.com/en-us/intune/device-management/tools/management-extension-windows)
 - [Troubleshoot Win32 apps and IME logs](https://learn.microsoft.com/en-us/intune/app-management/deployment/troubleshoot-win32)
 - [Troubleshoot Intune app installations](https://learn.microsoft.com/en-us/troubleshoot/mem/intune/app-management/troubleshoot-app-install)
 - [Intune network endpoints](https://learn.microsoft.com/en-us/intune/fundamentals/endpoints)
